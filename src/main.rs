@@ -1,5 +1,3 @@
-mod app;
-
 fn main() {
-    println!("Hello, world!");
+    image_viewer::app::app_main();
 }

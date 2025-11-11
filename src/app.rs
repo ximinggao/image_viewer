@@ -19,9 +19,13 @@ live_design! {
         icon_walk: {
             width: 10,
         },
+        grab_key_focus: false
     }
 
     SlideshowOverlay = <View> {
+        cursor: Arrow,
+        capture_overload: true,
+
         left_button = <SlideshowButton> {
             draw_icon: {
                 svg_file: (LEFT_ARROW)
@@ -66,6 +70,12 @@ struct State {
     current_image_index: usize,
 }
 
+impl State {
+    fn num_images(&self) -> usize {
+        self.image_paths.len()
+    }
+}
+
 #[derive(Live)]
 struct App {
     #[live]
@@ -79,6 +89,18 @@ struct App {
 }
 
 impl App {
+    fn go_to_previous_image(&mut self, cx: &mut Cx) {
+        if self.state.current_image_index > 0 {
+            self.set_current_image(cx, self.state.current_image_index - 1);
+        }
+    }
+
+    fn go_to_next_image(&mut self, cx: &mut Cx) {
+        if self.state.current_image_index + 1 < self.state.num_images() {
+            self.set_current_image(cx, self.state.current_image_index + 1);
+        }
+    }
+
     fn load_image_paths(&mut self, cx: &mut Cx, dir: &Path) {
         self.state.image_paths.clear();
 
@@ -123,8 +145,28 @@ impl LiveRegister for App {
     }
 }
 
+impl MatchEvent for App {
+    fn handle_actions(&mut self, cx: &mut Cx, actions: &Actions) {
+        if self.ui.button(id!(left_button)).clicked(&actions) {
+            self.go_to_previous_image(cx);
+        }
+        if self.ui.button(id!(right_button)).clicked(&actions) {
+            self.go_to_next_image(cx);
+        }
+
+        if let Some(event) = self.ui.view(id!(overlay)).key_down(&actions) {
+            match event.key_code {
+                KeyCode::ArrowLeft => self.go_to_previous_image(cx),
+                KeyCode::ArrowRight => self.go_to_next_image(cx),
+                _ => {}
+            }
+        }
+    }
+}
+
 impl AppMain for App {
     fn handle_event(&mut self, cx: &mut Cx, event: &Event) {
+        self.match_event(cx, event);
         self.ui.handle_event(cx, event, &mut Scope::empty());
     }
 }

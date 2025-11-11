@@ -1,4 +1,5 @@
 use makepad_widgets::*;
+use std::path::{Path, PathBuf};
 
 live_design! {
     use link::widgets::*;
@@ -25,13 +26,13 @@ live_design! {
             draw_icon: {
                 svg_file: (LEFT_ARROW)
             }
-        },
+        }
         <Filler> {}
         right_button = <SlideshowButton> {
             draw_icon: {
                 svg_file: (RIGHT_ARROW)
             }
-        },
+        }
     }
 
     Slideshow = <View> {
@@ -42,26 +43,78 @@ live_design! {
             height: Fill,
             fit: Biggest,
             source: (PLACEHOLDER)
-        },
+        }
 
-        overlay = <SlideshowOverlay> {},
+        overlay = <SlideshowOverlay> {}
     }
 
     App = {{App}} {
         ui: <Root> {
             <Window> {
                 body = <View> {
-                    <Slideshow> {}
+                    slideshow = <Slideshow> {}
                 }
             }
         }
+        placeholder: (PLACEHOLDER)
     }
 }
 
-#[derive(Live, LiveHook)]
+#[derive(Default)]
+struct State {
+    image_paths: Vec<PathBuf>,
+    current_image_index: usize,
+}
+
+#[derive(Live)]
 struct App {
     #[live]
     ui: WidgetRef,
+
+    #[live]
+    placeholder: LiveDependency,
+
+    #[rust]
+    state: State,
+}
+
+impl App {
+    fn load_image_paths(&mut self, cx: &mut Cx, dir: &Path) {
+        self.state.image_paths.clear();
+
+        for entry in dir.read_dir().unwrap() {
+            let path = entry.unwrap().path();
+            if path.is_file() {
+                if let Some(extension) = path.extension() {
+                    if extension == "png" || extension == "jpg" || extension == "jpeg" {
+                        self.state.image_paths.push(path);
+                    }
+                }
+            }
+        }
+
+        self.set_current_image(cx, 0);
+    }
+
+    fn set_current_image(&mut self, cx: &mut Cx, image_index: usize) {
+        self.state.current_image_index = image_index;
+
+        let image = self.ui.image(id!(slideshow.image));
+        if let Some(path) = self.state.image_paths.get(image_index) {
+            image.load_image_file_by_path_async(cx, &path).unwrap();
+        } else {
+            let placeholder = self.placeholder.as_str();
+            image.load_image_dep_by_path(cx, placeholder).unwrap();
+        }
+
+        self.ui.redraw(cx);
+    }
+}
+
+impl LiveHook for App {
+    fn after_new_from_doc(&mut self, cx: &mut Cx) {
+        self.load_image_paths(cx, "./images".as_ref());
+    }
 }
 
 impl LiveRegister for App {
